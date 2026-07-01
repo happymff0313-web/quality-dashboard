@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线质量仪表盘 V1.0</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <!-- ECharts CDN 备用 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="top-bar">
+        <div class="logo">
+            <span class="logo-icon">◈</span>
+            <span class="logo-text">质量仪表盘</span>
+            <span class="version-badge">V1.0</span>
+        </div>
+        <nav class="nav-tabs">
+            <a href="#" class="nav-tab active" data-page="overview">版本总览</a>
+            <a href="#" class="nav-tab" data-page="detail">版本详情</a>
+            <a href="#" class="nav-tab" data-page="rootcause">根因分析</a>
+            <a href="#" class="nav-tab" data-page="alerts">风险预警</a>
+        </nav>
+        <div class="top-actions">
+            <!-- 项目选择器 -->
+            <select id="projectSelect" class="version-select">
+                <option value="all">全部项目</option>
+                <option value="robot">RobotController_V2</option>
+                <option value="middleware">Middleware</option>
+                <option value="pc">RobotSoftware_PC</option>
+            </select>
+            
+            <!-- 分支选择器 -->
+            <select id="branchSelect" class="version-select">
+                <option value="main">main (默认)</option>
+            </select>
+            
+            <!-- 日期范围选择器 -->
+            <div class="date-range-picker">
+                <input type="date" id="startDate" class="date-input">
+                <span>至</span>
+                <input type="date" id="endDate" class="date-input">
+                <button id="filterBtn" class="btn btn-filter" title="应用筛选">应用</button>
+            </div>
+            
+            <script>
+                // 设置默认日期范围为最近30天
+                document.addEventListener("DOMContentLoaded", function() {
+                    var endDate = new Date();
+                    var startDate = new Date();
+                    startDate.setDate(endDate.getDate() - 30);
+                    
+                    document.getElementById("startDate").valueAsDate = startDate;
+                    document.getElementById("endDate").valueAsDate = endDate;
+                });
+            </script>
+            
+            <select id="versionSelect" class="version-select">
+                <option value="">全部版本</option>
+            </select>
+            <button id="refreshBtn" class="btn btn-refresh" title="刷新数据">⟳ 刷新</button>
+            <span id="lastUpdate" class="last-update"></span>
+            <span id="mockBadge" class="mock-badge" style="display:none;">模拟模式</span>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+
+        <!-- ========== 页面1: 版本总览 ========== -->
+        <section id="page-overview" class="page active">
+            <!-- KPI 卡片行 -->
+            <div class="kpi-row" id="kpiRow">
+                <!-- JS 动态渲染 -->
+            </div>
+
+            <!-- 质量评分 + 雷达图 -->
+            <div class="row row-2-1">
+                <div class="card card-radar">
+                    <div class="card-header">
+                        <h3>📊 版本质量雷达图</h3>
+                        <!-- <span class="card-hint">点击维度跳转详情</span> -->
+                    </div>
+                    <div id="radarChart" class="chart-container" style="height:380px;"></div>
+                </div>
+                <div class="card card-score">
+                    <div class="card-header">
+                        <h3>🏆 质量评分</h3>
+                        <div id="scoreGrade" style="display:flex; align-items:center; gap:8px; margin-left:16px;">
+                            <span style="color:#94a3b8; font-size:12px;">综合等级:</span>
+                            <span id="scoreGradeValue" style="font-size:28px; font-weight:bold;">-</span>
+                        </div>
+                    </div>
+                    <div id="scoreChart" class="chart-container" style="height:340px;"></div>
+                </div>
+            </div>
+
+            <!-- 关键指标对比 + 缺陷趋势 -->
+            <div class="row row-1-1">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📈 版本关键指标对比</h3>
+                    </div>
+                    <div id="commitChart" class="chart-container" style="height:340px;"></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🐛 缺陷趋势（30天）</h3>
+                    </div>
+                    <div id="bugTrendChart" class="chart-container" style="height:340px;"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== 页面2: 版本详情 ========== -->
+        <section id="page-detail" class="page">
+            <!-- ① 代码变更柱状图 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>① 代码变更统计</h3>
+                    <span class="card-hint">X轴: 日期 | Y轴: Commit数/代码行变更</span>
+                </div>
+                <div id="detailCommitChart" class="chart-container" style="height:360px;"></div>
+            </div>
+
+            <div class="row row-1-1">
+                <!-- ② 燃尽图 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>② 需求燃尽图</h3>
+                        <span class="card-hint">X轴: 日期 | Y轴: 剩余需求点数</span>
+                    </div>
+                    <div id="burndownChart" class="chart-container" style="height:340px;"></div>
+                </div>
+                <!-- ③ 缺陷趋势折线图 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>③ 每日新增/关闭/存量缺陷趋势</h3>
+                    </div>
+                    <div id="detailBugTrend" class="chart-container" style="height:340px;"></div>
+                </div>
+            </div>
+
+            <div class="row row-1-1">
+                <!-- ④ 缺陷分布饼图 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>④ 缺陷分布（按模块/严重级别）</h3>
+                    </div>
+                    <div id="bugDistChart" class="chart-container" style="height:380px;"></div>
+                </div>
+                <!-- ⑤ 用例执行结果分布 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>⑤ 用例执行结果分布</h3>
+                        <span class="card-hint">通过 🟢 / 失败 🔴 / 阻塞 🟡 / 忽略 ⚪ / 待执行 ⏳</span>
+                    </div>
+                    <div id="testResultPie" class="chart-container" style="height:380px;"></div>
+                </div>
+            </div>
+
+            <!-- ⑥ Commit 列表 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>⑥ 代码提交列表</h3>
+                    <span class="card-hint">点击 Commit ID 可跳转到 Gitea 代码仓库查看详情</span>
+                </div>
+                <div id="heatmapChart" class="chart-container" style="height:360px;"></div>
+            </div>
+        </section>
+
+        <!-- ========== 页面3: 根因分析 ========== -->
+        <section id="page-rootcause" class="page">
+            <div class="card">
+                <div class="card-header">
+                    <h3>🔗 用例→缺陷→代码 关联分析（桑基图）</h3>
+                    <span class="card-hint">定位用例遗漏导致的缺陷、高缺陷率代码模块</span>
+                </div>
+                <div id="sankeyChart" class="chart-container" style="height:500px;"></div>
+            </div>
+            <div class="row row-1-1">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🌹 模块缺陷分布（玫瑰图）</h3>
+                    </div>
+                    <div id="roseChart" class="chart-container" style="height:380px;"></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📋 模块质量排行</h3>
+                    </div>
+                    <div id="moduleRankChart" class="chart-container" style="height:380px;"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========== 页面4: 风险预警 ========== -->
+        <section id="page-alerts" class="page">
+            <div class="alert-summary-row" id="alertSummary">
+                <!-- JS 动态渲染 -->
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3>📢 风险预警时间线</h3>
+                </div>
+                <div id="alertTimelineChart" class="chart-container" style="height:400px;"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 底部 -->
+    <footer class="footer">
+        <span>在线质量仪表盘 V1.0</span>
+        <span>|</span>
+        <span>数据来源: GitLab + 禅道</span>
+        <span>|</span>
+        <span id="dataSourceStatus">连接中...</span>
+    </footer>
+
+    <!-- 加载本地 ECharts（如果 CDN 失败） -->
+    <script>
+        if (typeof echarts === 'undefined') {
+            document.write('<script src="/static/js/echarts.min.js"><\/script>');
+            document.write('<script src="/static/js/echarts-gl.min.js"><\/script>');
+        }
+    </script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
