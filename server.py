@@ -112,17 +112,39 @@ class GiteaClient:
 
     @retry_on_fail()
     def get_commits(self, branch="main"):
-        """获取 commit 列表（Gitea API v1）"""
+        """获取 commit 列表（Gitea API v1）- 支持分页获取所有 commits"""
         pid = self._get_project_id()
         if not pid:
             raise Exception("无法获取项目ID，请检查 GITEA_PROJECT 配置")
-        params = {"limit": 500, "sha": branch}
-        resp = self.session.get(
-            f"{self.base_url}/api/v1/repos/{GITEA_PROJECT}/commits",
-            params=params, timeout=15,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        
+        # Gitea API limit 最大为 50，需要分页获取
+        all_commits = []
+        page = 1
+        per_page = 50
+        
+        while True:
+            params = {"limit": per_page, "sha": branch, "page": page}
+            resp = self.session.get(
+                f"{self.base_url}/api/v1/repos/{GITEA_PROJECT}/commits",
+                params=params, timeout=15,
+            )
+            resp.raise_for_status()
+            commits = resp.json()
+            
+            if not commits:
+                break
+            
+            all_commits.extend(commits)
+            logger.info(f"获取 Gitea commits: 第 {page} 页，{len(commits)} 条，总计 {len(all_commits)} 条")
+            
+            # 如果返回的 commits 少于 per_page，说明已经是最后一页
+            if len(commits) < per_page:
+                break
+            
+            page += 1
+        
+        logger.info(f"Gitea commits 获取完成，共 {len(all_commits)} 条")
+        return all_commits
 
     @retry_on_fail()
     def get_branches(self):
@@ -165,17 +187,39 @@ class GiteaClientMiddleware:
 
     @retry_on_fail()
     def get_commits(self, branch="main"):
-        """获取 commit 列表（Gitea API v1）"""
+        """获取 commit 列表（Gitea API v1）- 支持分页获取所有 commits"""
         pid = self._get_project_id()
         if not pid:
             raise Exception("无法获取 middleware 项目ID，请检查 GITEA_PROJECT_MIDDLEWARE 配置")
-        params = {"limit": 500, "sha": branch}
-        resp = self.session.get(
-            f"{self.base_url}/api/v1/repos/{GITEA_PROJECT_MIDDLEWARE}/commits",
-            params=params, timeout=15,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        
+        # Gitea API limit 最大为 50，需要分页获取
+        all_commits = []
+        page = 1
+        per_page = 50
+        
+        while True:
+            params = {"limit": per_page, "sha": branch, "page": page}
+            resp = self.session.get(
+                f"{self.base_url}/api/v1/repos/{GITEA_PROJECT_MIDDLEWARE}/commits",
+                params=params, timeout=15,
+            )
+            resp.raise_for_status()
+            commits = resp.json()
+            
+            if not commits:
+                break
+            
+            all_commits.extend(commits)
+            logger.info(f"获取 middleware commits: 第 {page} 页，{len(commits)} 条，总计 {len(all_commits)} 条")
+            
+            # 如果返回的 commits 少于 per_page，说明已经是最后一页
+            if len(commits) < per_page:
+                break
+            
+            page += 1
+        
+        logger.info(f"middleware commits 获取完成，共 {len(all_commits)} 条")
+        return all_commits
 
     @retry_on_fail()
     def get_branches(self):
@@ -218,17 +262,39 @@ class GiteaClientPC:
 
     @retry_on_fail()
     def get_commits(self, branch="main"):
-        """获取 commit 列表（Gitea API v1）"""
+        """获取 commit 列表（Gitea API v1）- 支持分页获取所有 commits"""
         pid = self._get_project_id()
         if not pid:
             raise Exception("无法获取 PC 项目ID，请检查 GITEA_PROJECT_PC 配置")
-        params = {"limit": 500, "sha": branch}
-        resp = self.session.get(
-            f"{self.base_url}/api/v1/repos/{GITEA_PROJECT_PC}/commits",
-            params=params, timeout=15,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        
+        # Gitea API limit 最大为 50，需要分页获取
+        all_commits = []
+        page = 1
+        per_page = 50
+        
+        while True:
+            params = {"limit": per_page, "sha": branch, "page": page}
+            resp = self.session.get(
+                f"{self.base_url}/api/v1/repos/{GITEA_PROJECT_PC}/commits",
+                params=params, timeout=15,
+            )
+            resp.raise_for_status()
+            commits = resp.json()
+            
+            if not commits:
+                break
+            
+            all_commits.extend(commits)
+            logger.info(f"获取 PC commits: 第 {page} 页，{len(commits)} 条，总计 {len(all_commits)} 条")
+            
+            # 如果返回的 commits 少于 per_page，说明已经是最后一页
+            if len(commits) < per_page:
+                break
+            
+            page += 1
+        
+        logger.info(f"PC commits 获取完成，共 {len(all_commits)} 条")
+        return all_commits
 
     @retry_on_fail()
     def get_branches(self):
@@ -793,7 +859,6 @@ class QualityDataService:
             commits_rc = self._filter_commits_by_date(commits_rc, start_date, end_date)
             commits_mw = self._filter_commits_by_date(commits_mw, start_date, end_date)
             commits_pc = self._filter_commits_by_date(commits_pc, start_date, end_date)
-            commits_pc = self._filter_commits_by_date(commits_pc, start_date, end_date)
 
         # 合并所有仓库的 commits
         commits = commits_rc + commits_mw + commits_pc
@@ -855,7 +920,7 @@ class QualityDataService:
         total_bugs = len(bugs)
         closed_bugs = sum(1 for b in bugs if b.get("status") in ("closed", "resolved"))
         active_bugs = [b for b in bugs if b.get("status") not in ("closed", "resolved")]
-        p0_p1 = sum(1 for b in active_bugs if str(b.get("severity", "")) in ("1", "2"))
+        p0_p1 = sum(1 for b in active_bugs if str(b.get("priority", "")) in ("1", "2"))
 
         total_stories = len(stories)
         closed_stories = sum(1 for s in stories if s.get("status") == "closed")
@@ -871,7 +936,7 @@ class QualityDataService:
         # executed_cases: 已执行的测试用例数量
         executed_cases = len(executed_cases_detail)
         # passed_cases: 通过的测试用例数量
-        passed_cases = sum(1 for c in executed_cases_detail if c.get("执行结果") == "pass")
+        passed_cases = sum(1 for c in executed_cases_detail if c.get("lastRunResult") == "pass")
 
         # Bug Reopen率
         # 识别reopen的bug: activatedCount > 1 表示bug被重新激活过
@@ -1120,12 +1185,12 @@ class QualityDataService:
             return "Other"
         
         commit_list = []
-        for c in commits[:100]:
+        for c in commits:
             sha = c.get("id") or c.get("sha", "")
             # Gitea API 的 message 在 commit 对象下
             commit_obj = c.get("commit", {}) or {}
             full_msg = commit_obj.get("message", "") or c.get("message", "") or ""
-            msg_first_line = full_msg.split("\n")[0].strip()[:80]  # 第一行，最多80字符
+            msg_first_line = full_msg.split("\n")[0].strip()
             logger.info(f"Commit {sha[:8]}: message='{msg_first_line}'")
             
             # 识别模块
@@ -1169,6 +1234,12 @@ class QualityDataService:
                 "url": commit_url,
             })
 
+        # 输出 module 统计
+        module_count = {}
+        for c in commit_list:
+            mod = c.get("module", "Unknown")
+            module_count[mod] = module_count.get(mod, 0) + 1
+        logger.info(f"_calc_heatmap module distribution: {module_count}")
         logger.info(f"_calc_heatmap returning {len(commit_list)} commits")
         return {
             "commits": commit_list,
@@ -1244,8 +1315,10 @@ class QualityDataService:
         now = datetime.now()
         alerts = []
 
-        # 1. P0/P1 未关闭缺陷
-        p0_bugs = [b for b in bugs if str(b.get("severity", "")) in ("1", "2") and b.get("status") not in ("closed", "resolved")]
+        # 1. P0/P1 未关闭缺陷（使用优先级 pri）
+        p0_bugs = [b for b in bugs if str(b.get("priority", "")) in ("1", "2") and b.get("status") not in ("closed", "resolved")]
+        print("-----------p0bugs---------------")
+        print(p0_bugs)
         if p0_bugs:
             alerts.append({
                 "level": "critical",

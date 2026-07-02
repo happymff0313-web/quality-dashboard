@@ -161,9 +161,7 @@
     function loadData(version, silent) {
         var params = new URLSearchParams();
         if (version) params.append("version", version);
-        if (currentProject && currentProject !== "all") {
-            params.append("project", currentProject);
-        }
+        params.append("project", currentProject);  // 总是传递 project 参数
         if (currentBranch) params.append("branch", currentBranch);
         if (currentDateRange.start) params.append("start_date", currentDateRange.start);
         if (currentDateRange.end) params.append("end_date", currentDateRange.end);
